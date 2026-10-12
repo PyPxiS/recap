@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Récap</string>
+    <string name="title_activity_main">Récap</string>
+    <string name="package_name">com.pypxis.recap</string>
+    <string name="custom_url_scheme">com.pypxis.recap</string>
+</resources>

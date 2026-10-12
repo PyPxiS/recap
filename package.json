@@ -1,0 +1,14 @@
+{
+  "name": "recap",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@capacitor-community/speech-recognition": "7.0.1",
+    "@capacitor/android": "7.4.4",
+    "@capacitor/core": "7.4.4",
+    "@capacitor/share": "7.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "7.4.4"
+  }
+}

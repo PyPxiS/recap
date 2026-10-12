@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Récap Vocal</title>
+<script src="capacitor.js"></script>
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#111117">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: une colonne centrée de 640px ; le bouton d'enregistrement est le héros, la transcription défile dessous, les actions arrivent à la fin. */
+:root{
+  --bg:#f5f4f1; --surface:#ffffff; --ink:#1b1a22; --dim:#6c6a78; --line:#e3e1ea;
+  --rec:#e5484d; --accent:#3e46d8; --accent-ink:#ffffff; --ok:#1f8f5f; --warn-bg:#fff4e0; --warn:#9a5b00;
+  --f-display:"Bricolage Grotesque",system-ui,sans-serif;
+  --f-body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#111117; --surface:#1a1a22; --ink:#ecebf2; --dim:#9a98a8; --line:#2b2a36;
+  --rec:#ff5d62; --accent:#8b92ff; --accent-ink:#0e0e18; --ok:#4cc38a; --warn-bg:#2a2112; --warn:#f0b35a; color-scheme:dark;}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+body{padding:calc(env(safe-area-inset-top,0px) + 20px) 16px calc(env(safe-area-inset-bottom,0px) + 40px)}
+main{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+h1{margin:0;font-family:var(--f-display);font-weight:700;font-size:26px;letter-spacing:-.01em}
+h1 span{color:var(--rec)}
+button{font:inherit;font-weight:600;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:11px 16px;cursor:pointer;transition:transform .12s,border-color .2s}
+button:hover{border-color:var(--dim)}
+button:active{transform:scale(.97)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:default}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px}
+
+.stage{display:flex;flex-direction:column;align-items:center;gap:14px;padding:30px 20px}
+#rec{width:128px;height:128px;border-radius:50%;border:none;background:var(--rec);color:#fff;display:grid;place-items:center;box-shadow:0 10px 30px color-mix(in srgb,var(--rec) 35%,transparent);position:relative}
+#rec .core{width:44px;height:44px;border-radius:50%;background:#fff;transition:all .25s}
+#rec.on .core{width:36px;height:36px;border-radius:8px}
+#rec .halo{position:absolute;inset:-10px;border-radius:50%;border:3px solid var(--rec);opacity:0;transform:scale(var(--lvl,1))}
+#rec.on .halo{opacity:.35}
+#timer{font-family:var(--f-mono);font-size:30px;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+#status{color:var(--dim);font-size:14px;text-align:center;min-height:21px}
+
+.label{font-family:var(--f-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin:0 0 10px;display:flex;justify-content:space-between;gap:8px}
+#transcript{max-height:280px;overflow-y:auto;white-space:pre-wrap;font-size:15px;min-height:60px}
+#transcript .ts{font-family:var(--f-mono);font-size:11px;color:var(--dim);margin-right:8px}
+#transcript .interim{color:var(--dim)}
+#summary{white-space:pre-wrap;font-size:15px}
+.empty{color:var(--dim);margin:0}
+.actions{display:flex;flex-wrap:wrap;gap:10px}
+.actions button{flex:1 1 180px}
+.notice{background:var(--warn-bg);color:var(--warn);border-radius:12px;padding:12px 14px;font-size:14px;margin:0}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:600;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none}
+.toast.show{opacity:1}
+
+dialog{border:1px solid var(--line);border-radius:20px;background:var(--surface);color:var(--ink);padding:24px;width:min(520px,calc(100% - 32px));max-height:calc(100% - 40px)}
+dialog::backdrop{background:rgba(10,10,20,.45)}
+dialog h2{margin:0 0 4px;font-family:var(--f-display);font-size:22px}
+form.settings{display:flex;flex-direction:column;gap:16px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-weight:600;font-size:14px}
+.field small{color:var(--dim);font-size:12.5px}
+input,select{font:inherit;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%}
+fieldset{border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:12px;margin:0}
+legend{font-weight:600;font-size:14px;padding:0 6px}
+.row{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+code{font-family:var(--f-mono);font-size:12px;background:var(--bg);padding:1px 5px;border-radius:5px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Récap<span>.</span></h1>
+    <button id="openSettings">Réglages</button>
+  </header>
+
+  <p class="notice" id="support" hidden></p>
+
+  <section class="card stage">
+    <button id="rec" aria-label="Démarrer l'enregistrement"><span class="halo"></span><span class="core"></span></button>
+    <div id="timer">00:00</div>
+    <div id="status">Appuie pour enregistrer. La transcription s'affiche en direct.</div>
+  </section>
+
+  <section class="card">
+    <p class="label"><span>Transcription</span><span id="wordCount">0 mot</span></p>
+    <div id="transcript"><p class="empty">Rien d'enregistré pour l'instant.</p></div>
+  </section>
+
+  <section class="card" id="summaryCard" hidden>
+    <p class="label"><span>Récap</span><span id="summaryState"></span></p>
+    <div id="summary"></div>
+  </section>
+
+  <section class="actions" id="actions" hidden>
+    <button class="primary" id="send">Envoyer par mail</button>
+    <button id="dlTxt">Télécharger le texte</button>
+    <button id="dlAudio" hidden>Télécharger l'audio</button>
+    <button id="copy">Copier</button>
+    <button id="regen">Refaire le récap</button>
+    <button id="reset">Nouvel enregistrement</button>
+  </section>
+</main>
+
+<dialog id="settings">
+  <form class="settings" id="settingsForm" method="dialog">
+    <div><h2>Réglages</h2><small style="color:var(--dim)">Enregistrés uniquement dans ce navigateur.</small></div>
+    <div class="field">
+      <label for="email">Adresse mail de destination</label>
+      <input id="email" type="email" placeholder="toi@exemple.com" autocomplete="email">
+    </div>
+    <div class="field">
+      <label for="lang">Langue parlée</label>
+      <select id="lang"><option value="fr-FR">Français</option><option value="en-US">Anglais</option><option value="es-ES">Espagnol</option><option value="ca-ES">Catalan</option></select>
+    </div>
+    <div class="field">
+      <label for="apiKey">Clé API Anthropic (pour le résumé)</label>
+      <input id="apiKey" type="password" placeholder="sk-ant-…" autocomplete="off">
+      <small>À créer sur console.anthropic.com. Sans clé, tu reçois seulement la transcription.</small>
+    </div>
+    <fieldset>
+      <legend>Envoi automatique (optionnel)</legend>
+      <small style="color:var(--dim)">Sans ces trois champs, « Envoyer par mail » ouvre ta messagerie avec le récap pré-rempli. Avec un compte EmailJS gratuit, le mail part tout seul. Dans le modèle EmailJS, mets <code>{{to_email}}</code> en destinataire, <code>{{subject}}</code> en objet et <code>{{message}}</code> dans le corps.</small>
+      <div class="field"><label for="ejService">Service ID</label><input id="ejService" placeholder="service_xxxxx"></div>
+      <div class="field"><label for="ejTemplate">Template ID</label><input id="ejTemplate" placeholder="template_xxxxx"></div>
+      <div class="field"><label for="ejKey">Public key</label><input id="ejKey" placeholder="xxxxxxxxxxxx"></div>
+      <label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" id="autoSend" style="width:auto"> Envoyer dès que le récap est prêt</label>
+    </fieldset>
+    <div class="row"><button value="cancel" type="button" id="closeSettings">Annuler</button><button class="primary" id="saveSettings" value="ok">Enregistrer</button></div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+// ============================================================
+//  COLLE TA CLÉ API ENTRE LES GUILLEMETS CI-DESSOUS, PUIS ENREGISTRE LE FICHIER
+const CLE_API = "COLLE_TA_CLE_ICI";
+//  Ne partage pas ce fichier une fois la clé collée.
+// ============================================================
+(() => {
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d=''){ try { return localStorage.getItem('recap.'+k) ?? d; } catch { return d; } },
+  set(k, v){ try { localStorage.setItem('recap.'+k, v); } catch {} }
+};
+const CODE_KEY = CLE_API.startsWith('sk-ant-') ? CLE_API.trim() : '';
+const S = () => ({
+  email: store.get('email'), lang: store.get('lang','fr-FR'), apiKey: store.get('apiKey') || CODE_KEY,
+  ejService: store.get('ejService'), ejTemplate: store.get('ejTemplate'), ejKey: store.get('ejKey'),
+  autoSend: store.get('autoSend')==='1'
+});
+const toast = msg => { const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2600); };
+
+// ---------- réglages ----------
+const fields = ['email','lang','apiKey','ejService','ejTemplate','ejKey'];
+function openSettings(){ const s=S(); fields.forEach(f=>$(f).value=s[f]); $('autoSend').checked=s.autoSend; $('settings').showModal(); }
+$('openSettings').onclick = openSettings;
+$('closeSettings').onclick = () => $('settings').close();
+$('settingsForm').addEventListener('submit', e => {
+  fields.forEach(f=>store.set(f,$(f).value.trim())); store.set('autoSend',$('autoSend').checked?'1':'0');
+  toast('Réglages enregistrés');
+});
+
+// ---------- support ----------
+const Cap = window.Capacitor;
+const NATIVE = !!(Cap && Cap.isNativePlatform && Cap.isNativePlatform());
+const Speech = NATIVE ? Cap.registerPlugin('SpeechRecognition') : null;
+const ShareP = NATIVE ? Cap.registerPlugin('Share') : null;
+const SR = NATIVE ? true : (window.SpeechRecognition || window.webkitSpeechRecognition);
+if (NATIVE){ $('dlTxt').textContent = 'Partager'; }
+if (!SR){ $('support').hidden=false; $('support').textContent = "Ce navigateur ne fait pas la transcription vocale. Ouvre l'app dans Chrome, Edge ou Safari."; $('rec').disabled=true; }
+else if (!S().email){ $('status').textContent = "Commence par mettre ton adresse mail dans Réglages, puis appuie pour enregistrer."; }
+
+// ---------- enregistrement ----------
+let rec=null, recording=false, t0=0, tick=null, segments=[], interim='', mediaRec=null, chunks=[], audioBlob=null, stream=null, raf=null, startedAt=null;
+const mmss = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+const elapsed = () => (performance.now()-t0)/1000;
+
+function renderTranscript(){
+  const box = $('transcript');
+  if (!segments.length && !interim){ box.innerHTML = `<p class="empty">${recording?'J\'écoute…':'Rien d\'enregistré pour l\'instant.'}</p>`; }
+  else {
+    box.innerHTML = segments.map(s=>`<div><span class="ts">${mmss(s.t)}</span>${esc(s.text)}</div>`).join('') + (interim?`<div class="interim">${esc(interim)}</div>`:'');
+    box.scrollTop = box.scrollHeight;
+  }
+  const n = transcriptText().split(/\s+/).filter(Boolean).length;
+  $('wordCount').textContent = `${n.toLocaleString('fr-FR')} mot${n>1?'s':''}`;
+}
+const esc = s => s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const transcriptText = () => segments.map(s=>s.text).join(' ');
+const transcriptStamped = () => segments.map(s=>`[${mmss(s.t)}] ${s.text}`).join('\n');
+
+// ---------- Android natif ----------
+let sessionText='', watchdog=null, listening=false, restarting=false;
+const capFirst = t => t.charAt(0).toUpperCase()+t.slice(1);
+function commitSession(){
+  if (sessionText.trim()) segments.push({ t: elapsed(), text: capFirst(sessionText.trim()) });
+  sessionText=''; interim=''; renderTranscript();
+}
+async function nativeListen(){
+  if (!recording || restarting) return;
+  restarting = true;
+  try { await Speech.start({ language: S().lang, maxResults: 1, partialResults: true, popup: false }); listening = true; }
+  catch(e){ listening = false; }
+  finally { restarting = false; }
+}
+async function nativeStart(){
+  try {
+    let p = await Speech.checkPermissions();
+    if (p.speechRecognition !== 'granted') p = await Speech.requestPermissions();
+    if (p.speechRecognition !== 'granted'){ $('status').textContent = "Micro refusé. Autorise le micro dans les réglages Android de Récap."; return false; }
+  } catch(e){ $('status').textContent = "Reconnaissance vocale indisponible sur ce téléphone."; return false; }
+  try { await Speech.removeAllListeners(); } catch {}
+  await Speech.addListener('partialResults', d => { const m = d && d.matches && d.matches[0]; if (m){ sessionText = m; interim = m; renderTranscript(); } });
+  try { await Speech.addListener('listeningState', d => {
+    if (d && d.status === 'stopped'){ listening = false; commitSession(); if (recording) setTimeout(nativeListen, 200); }
+    if (d && d.status === 'started') listening = true;
+  }); } catch {}
+  // filet de sécurité : relance si Android a coupé l'écoute après un silence
+  watchdog = setInterval(async () => {
+    if (!recording) return;
+    try { const r = await Speech.isListening(); if (!r.listening && !restarting){ commitSession(); nativeListen(); } } catch {}
+  }, 1500);
+  return true;
+}
+
+async function start(){
+  segments=[]; interim=''; audioBlob=null; chunks=[]; $('summaryCard').hidden=true; $('actions').hidden=true;
+  if (NATIVE){
+    recording = true;
+    if (!(await nativeStart())){ recording = false; return; }
+    t0=performance.now(); startedAt=new Date(); sessionText='';
+    nativeListen();
+    $('rec').classList.add('on'); $('rec').setAttribute('aria-label',"Arrêter l'enregistrement");
+    $('status').textContent = 'Enregistrement en cours. Appuie à nouveau pour arrêter.';
+    tick = setInterval(()=>$('timer').textContent = mmss(elapsed()), 250);
+    renderTranscript();
+    return;
+  }
+  rec = new SR(); rec.lang = S().lang; rec.continuous = true; rec.interimResults = true;
+  rec.onresult = e => {
+    interim='';
+    for (let i=e.resultIndex;i<e.results.length;i++){
+      const r=e.results[i], txt=r[0].transcript.trim();
+      if (!txt) continue;
+      if (r.isFinal) segments.push({ t: elapsed(), text: txt.charAt(0).toUpperCase()+txt.slice(1) });
+      else interim += txt+' ';
+    }
+    renderTranscript();
+  };
+  rec.onerror = e => {
+    if (e.error==='not-allowed' || e.error==='service-not-allowed'){ stop(true); $('status').textContent = "Micro refusé. Autorise le micro pour cette page dans ton navigateur."; }
+  };
+  rec.onend = () => { if (recording) { try { rec.start(); } catch {} } };
+  try { rec.start(); } catch { }
+
+  // audio de secours + vu-mètre
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    if (window.MediaRecorder){ mediaRec = new MediaRecorder(stream); mediaRec.ondataavailable = e => e.data.size && chunks.push(e.data); mediaRec.onstop = () => { audioBlob = new Blob(chunks,{type:mediaRec.mimeType||'audio/webm'}); $('dlAudio').hidden=false; }; mediaRec.start(1000); }
+    const ctx = new (window.AudioContext||window.webkitAudioContext)(), an = ctx.createAnalyser(); an.fftSize=256;
+    ctx.createMediaStreamSource(stream).connect(an); const buf = new Uint8Array(an.frequencyBinCount);
+    const loop = () => { an.getByteTimeDomainData(buf); let m=0; for (const v of buf) m=Math.max(m,Math.abs(v-128)); $('rec').style.setProperty('--lvl', (1+m/128*.6).toFixed(3)); raf=requestAnimationFrame(loop); };
+    loop(); stream._ctx = ctx;
+  } catch {}
+
+  recording=true; t0=performance.now(); startedAt=new Date();
+  $('rec').classList.add('on'); $('rec').setAttribute('aria-label',"Arrêter l'enregistrement");
+  $('status').textContent = 'Enregistrement en cours. Appuie à nouveau pour arrêter.';
+  tick = setInterval(()=>$('timer').textContent = mmss(elapsed()), 250);
+  renderTranscript();
+}
+
+function stop(silent){
+  recording=false; clearInterval(tick); cancelAnimationFrame(raf);
+  if (NATIVE){ clearInterval(watchdog); Speech.stop().catch(()=>{}); setTimeout(commitSession, 400); }
+  try { rec && rec.stop(); } catch {}
+  try { mediaRec && mediaRec.state!=='inactive' && mediaRec.stop(); } catch {}
+  if (stream){ stream.getTracks().forEach(t=>t.stop()); stream._ctx && stream._ctx.close(); stream=null; }
+  $('rec').classList.remove('on'); $('rec').style.removeProperty('--lvl'); $('rec').setAttribute('aria-label',"Démarrer l'enregistrement");
+  if (silent) return;
+  // laisser arriver les derniers résultats
+  setTimeout(() => {
+    if (interim.trim()){ segments.push({ t: elapsed(), text: interim.trim() }); interim=''; }
+    renderTranscript();
+    if (!segments.length){ $('status').textContent = "Je n'ai rien entendu. Vérifie le micro et réessaie."; return; }
+    $('status').textContent = `Terminé : ${mmss(elapsed())} enregistrées.`;
+    $('actions').hidden=false; summarize();
+  }, 700);
+}
+$('rec').onclick = () => recording ? stop() : start();
+
+// ---------- résumé ----------
+let summary='';
+async function summarize(){
+  const { apiKey, autoSend } = S();
+  $('summaryCard').hidden=false;
+  if (!apiKey){ summary=''; $('summary').innerHTML = '<p class="empty">Ajoute ta clé API dans Réglages pour obtenir un résumé. La transcription est prête à être envoyée.</p>'; $('summaryState').textContent=''; return; }
+  $('summaryState').textContent = 'en cours…'; $('summary').innerHTML = '<p class="empty">Je rédige le récap…</p>';
+  $('send').disabled = true; $('regen').disabled = true;
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{ 'content-type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
+      body: JSON.stringify({
+        model:'claude-sonnet-5-5', max_tokens:1500,
+        system:"Tu rédiges des comptes rendus d'enregistrements vocaux (réunions, appels, notes). Réponds en français, en texte brut sans markdown (pas d'astérisques ni de dièses). Structure exactement : RÉSUMÉ (3 à 5 phrases), POINTS CLÉS (tirets), DÉCISIONS (tirets, ou « Aucune »), ACTIONS À FAIRE (tirets, avec qui et quand si mentionné, ou « Aucune »), QUESTIONS OUVERTES (tirets, ou « Aucune »). Reste fidèle à la transcription, n'invente rien. La transcription vient d'une reconnaissance vocale automatique : corrige mentalement les mots mal reconnus quand le sens est évident.",
+        messages:[{ role:'user', content:`Durée : ${mmss(elapsed())}\nTranscription :\n${transcriptStamped()}` }]
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error?.message || res.status);
+    summary = data.content.map(c=>c.text||'').join('').trim();
+    $('summary').textContent = summary; $('summaryState').textContent = 'prêt';
+    if (autoSend && canAutoSend()) send();
+  } catch(err){
+    summary='';
+    $('summary').innerHTML = `<p class="empty">Le résumé a échoué (${esc(String(err.message||err))}). Vérifie ta clé API dans Réglages, puis « Refaire le récap ».</p>`;
+    $('summaryState').textContent = 'erreur';
+  } finally { $('send').disabled=false; $('regen').disabled=false; }
+}
+$('regen').onclick = summarize;
+
+// ---------- sorties ----------
+const subject = () => `Récap du ${startedAt.toLocaleDateString('fr-FR')} à ${startedAt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})} (${mmss(elapsed())})`;
+const fullText = () => `${subject()}\n\n${summary ? summary+'\n\n' : ''}TRANSCRIPTION\n\n${transcriptStamped()}\n`;
+const canAutoSend = () => { const s=S(); return s.email && s.ejService && s.ejTemplate && s.ejKey; };
+
+async function send(){
+  const s = S();
+  if (!s.email){ toast('Ajoute ton adresse mail dans Réglages'); openSettings(); return; }
+  if (canAutoSend()){
+    $('send').disabled=true; $('send').textContent='Envoi…';
+    try {
+      const r = await fetch('https://api.emailjs.com/api/v1.0/email/send',{ method:'POST', headers:{'content-type':'application/json'},
+        body: JSON.stringify({ service_id:s.ejService, template_id:s.ejTemplate, user_id:s.ejKey, template_params:{ to_email:s.email, subject:subject(), message:fullText() } }) });
+      if (!r.ok) throw new Error(await r.text());
+      toast(`Envoyé à ${s.email}`);
+    } catch(e){ toast("L'envoi a échoué. Vérifie les identifiants EmailJS."); }
+    finally { $('send').disabled=false; $('send').textContent='Envoyer par mail'; }
+    return;
+  }
+  // repli : messagerie pré-remplie (corps limité en longueur par les clients mail)
+  let body = fullText();
+  const lim = NATIVE ? 12000 : 1800;
+  if (body.length > lim) body = body.slice(0,lim) + "\n\n[Transcription tronquée. Utilise « Partager » pour le texte complet.]";
+  if (!NATIVE && fullText().length > lim) downloadTxt();
+  location.href = `mailto:${encodeURIComponent(s.email)}?subject=${encodeURIComponent(subject())}&body=${encodeURIComponent(body)}`;
+}
+$('send').onclick = send;
+
+function save(blob, name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1000); }
+const stamp = () => startedAt.toISOString().slice(0,16).replace(/[:T]/g,'-');
+function downloadTxt(){ save(new Blob([fullText()],{type:'text/plain;charset=utf-8'}), `recap-${stamp()}.txt`); }
+$('dlTxt').onclick = () => NATIVE ? ShareP.share({ title: subject(), text: fullText(), dialogTitle: 'Partager le récap' }).catch(()=>{}) : downloadTxt();
+$('dlAudio').onclick = () => audioBlob && save(audioBlob, `recap-${stamp()}.${(audioBlob.type.includes('mp4')?'m4a':'webm')}`);
+$('copy').onclick = async () => { try { await navigator.clipboard.writeText(fullText()); toast('Copié'); } catch { toast('Copie impossible'); } };
+$('reset').onclick = () => { segments=[]; interim=''; summary=''; $('timer').textContent='00:00'; $('summaryCard').hidden=true; $('actions').hidden=true; $('dlAudio').hidden=true; $('status').textContent="Appuie pour enregistrer."; renderTranscript(); };
+})();
+</script>
+</body>
+</html>
